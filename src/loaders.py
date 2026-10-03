@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 """Carga de documentos (.txt, .md, .pdf) como secciones con metadata."""
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +16,11 @@ class Section:
     source: str
     page: int | None
 
+def _clean(text: str) -> str:
+    """Normaliza el texto extraído de PDFs."""
+    text = unicodedata.normalize("NFKC", text)  # convierte "ﬃ" en "ffi"
+    return re.sub(r"\.{4,}", " ", text)  # quita los puntos guía del índice
+
 
 def load_document(path: Path) -> list[Section]:
     path = Path(path)
@@ -23,7 +31,7 @@ def load_document(path: Path) -> list[Section]:
     if suffix == ".pdf":
         reader = PdfReader(path)
         sections = [
-            Section(text=page.extract_text() or "", source=path.name, page=number)
+            Section(text=_clean(page.extract_text() or ""), source=path.name, page=number)
             for number, page in enumerate(reader.pages, start=1)
         ]
         sections = [s for s in sections if s.text.strip()]

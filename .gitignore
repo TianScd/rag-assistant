@@ -6,3 +6,6 @@ chroma_db/
 __pycache__/
 *.pyc
 .DS_Store
+# Documentos con copyright: se descargan según el README
+data/docs/*
+!data/docs/.gitkeep
