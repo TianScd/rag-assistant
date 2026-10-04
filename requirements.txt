@@ -4,3 +4,4 @@ pypdf
 chromadb
 sentence-transformers
 google-genai
+streamlit
