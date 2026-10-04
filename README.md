@@ -31,7 +31,21 @@ pregunta -> embeddings -> vector_store (busca los 4 fragmentos más parecidos)
 
 - Python 3.11 o superior. Probado con Python 3.13.7 en Linux.
 - Una API key de Gemini (Google AI Studio).
-- Internet la primera vez: se descarga el modelo de embeddings (`intfloat/multilingual-e5-small`) y luego queda en caché. Puede aparecer un aviso sobre `HF_TOKEN`; no impide que funcione.
+- Internet la primera vez: se descarga el modelo de embeddings (`intfloat/multilingual-e5-small`)
+
+## Dependencias
+
+Se instalan con `pip install -r requirements.txt`. No tienen versión fija: se instala la última disponible.
+
+| Paquete | Para qué se usa |
+| --- | --- |
+| `python-dotenv` | Carga las variables de `.env`. |
+| `pypdf` | Extrae el texto de los PDFs. |
+| `chromadb` | Vector store local. |
+| `sentence-transformers` | Corre el modelo de embeddings en tu máquina. |
+| `google-genai` | Cliente de la API de Gemini. |
+| `streamlit` | Interfaz web. |
+| `pytest` | Tests. |
 
 ## Instalación
 
@@ -57,12 +71,12 @@ pip install -r requirements.txt
 
 Uso cuatro guías de AWS (AWS Prescriptive Guidance) y las pongo en `data/docs/`:
 
-| Archivo | Descarga |
-| --- | --- |
-| `choosing-an-aws-vector-database-for-rag-use-cases.pdf` | TODO: añadir enlace |
-| `writing-best-practices-rag.pdf` | TODO: añadir enlace |
-| `deploy-rag-use-case-on-aws.md` | TODO: añadir enlace |
-| `introduction.md` | TODO: añadir enlace |
+| Archivo | Descarga | Tipo|
+| --- | --- | --- |
+| `choosing-an-aws-vector-database-for-rag-use-cases.pdf` | https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-an-aws-vector-database-for-rag-use-cases/introduction.html | pdf|
+| `writing-best-practices-rag.pdf` | https://docs.aws.amazon.com/prescriptive-guidance/latest/writing-best-practices-rag/introduction.html | pdf |
+| `deploy-rag-use-case-on-aws.md` | https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/deploy-rag-use-case-on-aws.html | md |
+| `introduction.md` | https://docs.aws.amazon.com/prescriptive-guidance/latest/rag-healthcare-use-cases/introduction.html | md |
 
 No están en el repositorio porque tienen copyright de AWS; por eso `data/docs/` está en `.gitignore`.
 Descárgalos tú y guárdalos en `data/docs/` con esos nombres. También puedes usar tus propios documentos.
@@ -90,20 +104,41 @@ python -c "from src.pipeline import ingest_directory; print(ingest_directory())"
 
 ## Tests
 
+### Tests unitarios
+
 ```bash
-python -m pytest -v          # 9 tests de chunker y loaders; no usan la API
-python tests/run_eval.py     # hace 6 preguntas reales y escribe evidence/eval_results.md
+python -m pytest -v
 ```
 
-- `run_eval.py` necesita los documentos ya indexados y `LLM_API_KEY` configurada.
-- **Cada ejecución de `run_eval.py` gasta cuota de tu API** (6 preguntas) y sobrescribe `evidence/eval_results.md`.
-- Las preguntas y sus respuestas están en `tests/eval_questions.md`. El resultado de `pytest` guardado está en `evidence/pytest_output.txt`.
+Son 9 tests de `chunker` y `loaders`. No usan la API. Salida guardada: [evidence/pytest_output.txt](evidence/pytest_output.txt).
+
+### Evaluación con preguntas reales
+
+```bash
+python tests/run_eval.py
+```
+
+Hace 6 preguntas al sistema, una sola vez cada una, y escribe los resultados en `evidence/eval_results.md`.
+
+Antes de ejecutarlo:
+- Los documentos deben estar indexados.
+- `LLM_API_KEY` debe estar configurada.
+- **Cada ejecución gasta cuota de tu API** (6 preguntas) y sobrescribe `evidence/eval_results.md`.
+
+Qué genera y dónde verlo:
+
+| Archivo | Contenido |
+| --- | --- |
+| [tests/eval_questions.md](tests/eval_questions.md) | Las 6 preguntas, su tipo, la respuesta del sistema y las fuentes citadas. |
+| [evidence/eval_results.md](evidence/eval_results.md) | Salida completa de la última ejecución: modelo que respondió, respuesta, citas y los fragmentos recuperados con su similitud. |
+
+`run_eval.py` solo escribe `evidence/eval_results.md`. `tests/eval_questions.md` es un resumen que se actualiza a mano con esos resultados.
 
 ## Decisiones de diseño
 
 - **Embeddings multilingües y locales** (`intfloat/multilingual-e5-small`): los documentos de ejemplo están en inglés y las preguntas pueden ser en español. Con un modelo multilingüe, una pregunta en español encuentra fragmentos en inglés. Corre en tu máquina, sin costo por consulta.
 - **Fragmentos de 800 caracteres con 100 de solape:** el texto se corta, si puede, en un párrafo, una línea o una oración, y el solape evita perder contexto en los bordes. Se recuperan 4 fragmentos por pregunta (ajustable de 2 a 8 en la interfaz). TODO (autor): ¿por qué elegiste 800 y 100?
-- **Modelo de respaldo:** si el modelo principal falla, se usa `gemini-3.7-flash`. Ante errores del servidor (5xx) se reintenta hasta 3 veces con espera de 2 y 4 segundos. Si es un error de cuota (429), pasa directo al respaldo. En las 6 preguntas de evaluación respondió siempre el modelo principal, así que el respaldo no se ha probado.
+- **Modelo de respaldo:** si el modelo principal falla, se usa `gemini-3.7-flash`. Ante errores del servidor (5xx) se reintenta hasta 3 veces con espera de 2 y 4 segundos. Si es un error de cuota (429), pasa directo al respaldo.
 - **Prompt anti-alucinación:** el modelo recibe solo los fragmentos y reglas claras: no usar conocimiento externo, decir cuando la información no alcanza, responder solo la parte respaldada si es parcial, responder en el idioma de la pregunta, citar `[archivo, pág. N]` e ignorar órdenes que aparezcan dentro de los documentos. La temperatura es baja (0.2). Si la búsqueda no devuelve ningún fragmento, se avisa sin llamar al modelo.
 
 ## Limitaciones conocidas
@@ -113,3 +148,66 @@ python tests/run_eval.py     # hace 6 preguntas reales y escribe evidence/eval_r
 - **PDFs escaneados:** no se leen. Sin texto extraíble, el archivo se rechaza.
 - **Servicio externo con cuota:** la generación depende de Gemini. Si se agota la cuota o el servicio falla, no hay respuesta.
 - **Contenido duplicado entre documentos:** los documentos de ejemplo repiten temas, así que los fragmentos recuperados pueden ser redundantes.
+
+## Mejoras futuras
+
+- **Memoria de conversación:** que el asistente recuerde las preguntas anteriores y entienda preguntas de seguimiento.
+- **Respuesta en streaming:** mostrar la respuesta mientras se genera, en lugar de esperar a que termine.
+- **Servicio FastAPI:** una API separada de la interfaz, para que otros sistemas puedan consumir el asistente.
+- **Más formatos:** .docx, HTML o páginas web por URL.
+
+## Anexo: requisitos de la prueba técnica (sección 4)
+
+Estado de cada requisito y dónde está cubierto.
+
+### 4.1 Aplicación básica
+
+| Requisito | Estado | Dónde |
+| --- | --- | --- |
+| Cargar documentos de texto, PDF o Markdown | Sí | `src/loaders.py`; subida de archivos en la interfaz |
+| Dividir el contenido en fragmentos | Sí | `src/chunker.py` |
+| Generar embeddings | Sí | `src/embeddings.py` |
+| Guardar los embeddings en un vector store local | Sí | `src/vector_store.py` (ChromaDB, carpeta `chroma_db/`) |
+| Realizar preguntas | Sí | Interfaz Streamlit (`app.py`) |
+| Recuperar contexto relevante | Sí | `search()` en `src/vector_store.py` |
+| Generar una respuesta basada en lo recuperado | Sí | `src/generator.py` |
+
+### 4.2 RAG básico
+
+| Requisito | Estado | Dónde |
+| --- | --- | --- |
+| Carga de mínimo 2 documentos | Sí | 4 documentos de ejemplo (ver "Documentos de ejemplo") |
+| Chunking | Sí | 800 caracteres con 100 de solape |
+| Vector store local | Sí | ChromaDB |
+| Consulta por similitud | Sí | Similitud coseno, 4 fragmentos por defecto |
+| Respuesta generada por un modelo | Sí | Gemini |
+| Referencia al fragmento o documento usado | Sí | Citas `[archivo, pág. N]` en la respuesta |
+
+### 4.3 Uso de AI-assisted development
+
+| Requisito | Estado | Dónde |
+| --- | --- | --- |
+| Herramientas usadas | Sí | `AI_USAGE.md` |
+| Para qué las usó | Sí | `AI_USAGE.md`|
+| Qué partes revisó manualmente | Sí | `AI_USAGE.md`|
+| Qué aprendió durante el desarrollo | Sí | `AI_USAGE.md`|
+
+### 4.4 Pruebas básicas
+
+| Requisito | Estado | Dónde |
+| --- | --- | --- |
+| Mínimo 3 preguntas: respondible, parcial y fuera de los documentos | Sí | 6 preguntas en `tests/eval_questions.md` |
+| Registrar la respuesta generada | Sí | `tests/eval_questions.md` y `evidence/eval_results.md` |
+
+### 4.5 Documentación
+
+| Requisito | Estado | Dónde |
+| --- | --- | --- |
+| Descripción de la solución | Sí | Inicio de este README y "Cómo funciona" |
+| Pasos de instalación | Sí | "Instalación" y "Configuración de credenciales" |
+| Pasos de ejecución | Sí | "Cómo ejecutar" |
+| Dependencias | Sí | "Dependencias" |
+| Cómo cargar documentos | Sí | "Cómo ejecutar", paso 2 |
+| Cómo hacer preguntas | Sí | "Cómo ejecutar", paso 3 |
+| Limitaciones conocidas | Sí | "Limitaciones conocidas" |
+| Mejoras futuras | Sí | "Mejoras futuras" |
