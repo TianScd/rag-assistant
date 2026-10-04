@@ -84,9 +84,10 @@ if st.button("Preguntar", type="primary") and question.strip():
                 f"El modelo principal ({LLM_MODEL}) no respondió; "
                 "se usó el de respaldo."
             )
+        cited = [s for s in answer.sources if s.source in answer.text]
         sources = list(dict.fromkeys(
             f"{s.source}, pág. {s.page}" if s.page is not None else s.source
-            for s in answer.sources
+            for s in cited
         ))
         if sources:
             st.markdown("**Fuentes:** " + " · ".join(sources))
