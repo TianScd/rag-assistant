@@ -14,10 +14,6 @@ from src.pipeline import (
 )
 
 
-def preview(text: str, limit: int = 220) -> str:
-    """Resumen de una sola línea: junta los espacios y recorta el texto."""
-    flat = " ".join(text.split())
-    return flat if len(flat) <= limit else flat[:limit].rstrip() + "…"
 
 
 st.set_page_config(page_title="Asistente documental", page_icon="📄")
@@ -63,7 +59,6 @@ with st.sidebar:
         st.info("Aún no hay documentos indexados.")
 
     k = st.slider("Fragmentos a recuperar", min_value=2, max_value=8, value=4)
-    full_text = st.toggle("Mostrar fragmentos completos", value=False)
     st.caption(f"Modelo configurado: {LLM_MODEL} ({LLM_PROVIDER})")
 
 question = st.text_input("Haz una pregunta sobre los documentos")
@@ -89,11 +84,9 @@ if st.button("Preguntar", type="primary") and question.strip():
                 f"El modelo principal ({LLM_MODEL}) no respondió; "
                 "se usó el de respaldo."
             )
-        with st.expander(f"Fuentes usadas ({len(answer.sources)})"):
-            for source in answer.sources:
-                page = f", pág. {source.page}" if source.page is not None else ""
-                st.markdown(f"**{source.source}{page}** · similitud {source.score:.2f}")
-                if full_text:
-                    st.text(source.text)
-                else:
-                    st.caption(preview(source.text))
+        sources = list(dict.fromkeys(
+            f"{s.source}, pág. {s.page}" if s.page is not None else s.source
+            for s in answer.sources
+        ))
+        if sources:
+            st.markdown("**Fuentes:** " + " · ".join(sources))
