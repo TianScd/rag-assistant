@@ -1,5 +1,6 @@
 """Generación de la respuesta con Gemini a partir de los fragmentos recuperados."""
 import time
+from dataclasses import dataclass
 from functools import lru_cache
 
 from google import genai
@@ -14,6 +15,11 @@ MAX_ATTEMPTS = 3
 NO_CONTEXT_MESSAGE = (
     "No encontré información relevante en los documentos para responder esa pregunta."
 )
+
+@dataclass
+class Generation:
+    text: str
+    model: str | None  # None si no se llamó a ningún modelo
 
 SYSTEM_INSTRUCTION = """Eres un asistente que responde preguntas usando ÚNICAMENTE \
 los fragmentos de documentos incluidos en el mensaje del usuario.
@@ -72,10 +78,10 @@ def _call_model(model: str, prompt: str):
 
 ##------------------------------------------------------------------------------
 
-def generate_answer(question: str, results: list[SearchResult]) -> str:
+def generate_answer(question: str, results: list[SearchResult]) -> Generation:
     """Responde la pregunta usando solo los fragmentos recuperados."""
     if not results:
-        return NO_CONTEXT_MESSAGE
+        return Generation(text=NO_CONTEXT_MESSAGE, model=None)
     prompt = build_prompt(question, results)
     models = [LLM_MODEL]
     if FALLBACK_MODEL != LLM_MODEL:
@@ -85,7 +91,8 @@ def generate_answer(question: str, results: list[SearchResult]) -> str:
     for model in models:
         try:
             response = _call_model(model, prompt)
-            return response.text or "El modelo no devolvió texto. Intenta reformular la pregunta."
+            text = response.text or "El modelo no devolvió texto. Intenta reformular la pregunta."
+            return Generation(text=text, model=model)
         except errors.APIError as error:
             last_error = error
     raise RuntimeError(
