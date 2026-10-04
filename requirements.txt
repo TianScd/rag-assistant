@@ -3,3 +3,4 @@ pytest
 pypdf
 chromadb
 sentence-transformers
+google-genai
