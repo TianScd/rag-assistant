@@ -137,7 +137,8 @@ Qué genera y dónde verlo:
 ## Decisiones de diseño
 
 - **Embeddings multilingües y locales** (`intfloat/multilingual-e5-small`): los documentos de ejemplo están en inglés y las preguntas pueden ser en español. Con un modelo multilingüe, una pregunta en español encuentra fragmentos en inglés. Corre en tu máquina, sin costo por consulta.
-- **Fragmentos de 800 caracteres con 100 de solape:** el texto se corta, si puede, en un párrafo, una línea o una oración, y el solape evita perder contexto en los bordes. Se recuperan 4 fragmentos por pregunta (ajustable de 2 a 8 en la interfaz). TODO (autor): ¿por qué elegiste 800 y 100?
+- **Fragmentos de 800 caracteres con 100 de solape:** el texto se corta, si puede, en un párrafo, una línea o una oración, y el solape evita perder contexto en los bordes. Se recuperan 4 fragmentos por pregunta (ajustable de 2 a 8 en la interfaz). ¿por qué elegiste 800 y 100? 
+**r:** Usé 800 caracteres con 100 de solape porque son los valores que se suelen usar de punto de partida en un RAG, y me parecieron razonables para empezar. Un fragmento de 800 caracteres son unos 200 tokens, así que entra de sobra en los 512 que admite el modelo de embeddings y no se corta nada.
 - **Modelo de respaldo:** si el modelo principal falla, se usa `gemini-3.7-flash`. Ante errores del servidor (5xx) se reintenta hasta 3 veces con espera de 2 y 4 segundos. Si es un error de cuota (429), pasa directo al respaldo.
 - **Prompt anti-alucinación:** el modelo recibe solo los fragmentos y reglas claras: no usar conocimiento externo, decir cuando la información no alcanza, responder solo la parte respaldada si es parcial, responder en el idioma de la pregunta, citar `[archivo, pág. N]` e ignorar órdenes que aparezcan dentro de los documentos. La temperatura es baja (0.2). Si la búsqueda no devuelve ningún fragmento, se avisa sin llamar al modelo.
 
